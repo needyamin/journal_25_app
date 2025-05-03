@@ -27,25 +27,32 @@ class _JournalDetailScreenState extends State<JournalDetailScreen> {
   @override
   void initState() {
     super.initState();
+    print('JournalDetailScreen: initState called for journal ID ${widget.journalId}');
     _loadData();
   }
 
   Future<void> _loadData() async {
     try {
+      print('JournalDetailScreen: Loading data for journal ID ${widget.journalId}');
       final journalResponse = await _apiService.getJournalDetails(widget.journalId);
+      print('JournalDetailScreen: Journal data loaded');
+      
       final articlesResponse = await _apiService.getArticles(journalId: widget.journalId);
+      print('JournalDetailScreen: Articles data loaded');
 
       if (mounted) {
         setState(() {
           _journal = journalResponse.data;
           _articles = articlesResponse.data['data'];
           _isLoading = false;
+          print('JournalDetailScreen: Data loaded successfully');
         });
       }
     } catch (e) {
+      print('JournalDetailScreen: Error loading data - $e');
       if (mounted) {
         setState(() {
-          _errorMessage = 'Failed to load journal data';
+          _errorMessage = 'Failed to load journal data: ${e.toString()}';
           _isLoading = false;
         });
       }
@@ -54,11 +61,33 @@ class _JournalDetailScreenState extends State<JournalDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print('JournalDetailScreen: Building UI');
     return Scaffold(
+      appBar: AppBar(
+        title: Text(_isLoading ? 'Journal Details' : (_journal?['title'] ?? 'Journal')),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadData,
+          ),
+        ],
+      ),
       body: _isLoading
           ? _buildShimmerLoading()
           : _errorMessage != null
-              ? Center(child: Text(_errorMessage!))
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(_errorMessage!),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadData,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
               : CustomScrollView(
                   slivers: [
                     SliverAppBar(
@@ -179,7 +208,10 @@ class _JournalDetailScreenState extends State<JournalDetailScreen> {
                           final article = _articles[index];
                           return ArticleCard(
                             article: article,
-                            onTap: () => context.go('/article/${article['article_id']}'),
+                            onTap: () => context.goNamed(
+                              'article_detail',
+                              pathParameters: {'articleId': article['article_id'].toString()},
+                            ),
                           );
                         },
                         childCount: _articles.length,

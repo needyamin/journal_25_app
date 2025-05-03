@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
+import 'dart:math';
 import 'package:permission_handler/permission_handler.dart';
 
 class ArticleDetailScreen extends StatefulWidget {
@@ -29,23 +30,28 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   @override
   void initState() {
     super.initState();
+    print('ArticleDetailScreen: initState called for article ID ${widget.articleId}');
     _loadData();
   }
 
   Future<void> _loadData() async {
     try {
+      print('ArticleDetailScreen: Loading data for article ID ${widget.articleId}');
       final response = await _apiService.getArticleDetails(widget.articleId);
+      print('ArticleDetailScreen: Article data loaded');
 
       if (mounted) {
         setState(() {
           _article = response.data;
           _isLoading = false;
+          print('ArticleDetailScreen: Data loaded successfully');
         });
       }
     } catch (e) {
+      print('ArticleDetailScreen: Error loading data - $e');
       if (mounted) {
         setState(() {
-          _errorMessage = 'Failed to load article data';
+          _errorMessage = 'Failed to load article data: ${e.toString()}';
           _isLoading = false;
         });
       }
@@ -58,6 +64,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     });
 
     try {
+      print('ArticleDetailScreen: Downloading $fileType file for article ID ${widget.articleId}');
       final status = await Permission.storage.request();
       if (!status.isGranted) {
         throw Exception('Storage permission denied');
@@ -67,6 +74,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
       final directory = await getApplicationDocumentsDirectory();
       final file = File('${directory.path}/article_${widget.articleId}.$fileType');
       await file.writeAsBytes(response.data);
+      print('ArticleDetailScreen: File downloaded to ${file.path}');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -84,6 +92,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
         );
       }
     } catch (e) {
+      print('ArticleDetailScreen: Error downloading file - $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -103,10 +112,15 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print('ArticleDetailScreen: Building UI');
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Article Details'),
+        title: Text(_isLoading ? 'Article Details' : (_article?['title'] ?? 'Article').substring(0, min((_article?['title'] ?? 'Article').length, 20)) + '...'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadData,
+          ),
           if (_article != null)
             IconButton(
               icon: const Icon(Icons.download),
@@ -142,7 +156,19 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
       body: _isLoading
           ? _buildShimmerLoading()
           : _errorMessage != null
-              ? Center(child: Text(_errorMessage!))
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(_errorMessage!),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadData,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
               : SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
                   child: Column(

@@ -34,15 +34,27 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   Future<void> _checkAuthStatus() async {
-    await Future.delayed(const Duration(seconds: 2));
-    final token = await _storage.read(key: 'auth_token');
-    
-    if (!mounted) return;
-    
-    if (token != null) {
-      context.go('/');
-    } else {
-      context.go('/login');
+    try {
+      await Future.delayed(const Duration(seconds: 2));
+      final token = await _storage.read(key: 'auth_token');
+      
+      if (!mounted) return;
+      
+      print('SplashScreen: Token status - ${token != null ? "Found" : "Not found"}');
+      
+      if (token != null) {
+        print('SplashScreen: Navigating to home');
+        context.goNamed('home');
+      } else {
+        print('SplashScreen: Navigating to login');
+        context.goNamed('login');
+      }
+    } catch (e) {
+      print('SplashScreen: Error checking auth status - $e');
+      if (mounted) {
+        // Fallback to login on error
+        context.goNamed('login');
+      }
     }
   }
 
