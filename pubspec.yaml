@@ -54,6 +54,7 @@ dependencies:
   flutter_markdown: ^0.6.18
   url_launcher: ^6.2.4
   pdf_viewer_plugin: ^2.0.0
+  google_fonts: ^6.2.1
   file_picker: 
     git:
       url: https://github.com/miguelpruivo/flutter_file_picker.git

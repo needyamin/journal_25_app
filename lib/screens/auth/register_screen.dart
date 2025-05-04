@@ -39,27 +39,66 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      final response = await _apiService.register(
-        _nameController.text,
-        _emailController.text,
+      print('RegisterScreen: Attempting registration...');
+      final result = await _apiService.register(
+        _nameController.text.trim(),
+        _emailController.text.trim(),
         _passwordController.text,
       );
 
-      if (response.statusCode == 200) {
-        final token = response.data['token'];
-        await _storage.write(key: 'auth_token', value: token);
+      print('RegisterScreen: Registration result - $result');
+
+      if (!mounted) {
+        print('RegisterScreen: Widget not mounted, aborting navigation');
+        return;
+      }
+
+      if (result['success'] == true) {
+        // Clear the form
+        _nameController.clear();
+        _emailController.clear();
+        _passwordController.clear();
+        _confirmPasswordController.clear();
+        
+        // Navigate to home screen
+        print('RegisterScreen: Registration successful, navigating to home...');
+        
+        // Ensure we give time for the token to be stored
+        await Future.delayed(const Duration(milliseconds: 100));
         
         if (!mounted) return;
-        context.go('/');
+        
+        try {
+          print('RegisterScreen: Using named route navigation');
+          context.goNamed('home');
+        } catch (e) {
+          print('RegisterScreen: Named route navigation failed - $e');
+          if (mounted) {
+            print('RegisterScreen: Fallback to path navigation');
+            context.go('/');
+          }
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _errorMessage = result['message'] ?? 'Registration failed. Please try again.';
+          });
+          print('RegisterScreen: Registration failed - $_errorMessage');
+        }
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to register. Please try again.';
-      });
+      print('RegisterScreen: Registration error - $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'An error occurred. Please try again.';
+        });
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

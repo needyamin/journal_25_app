@@ -226,8 +226,11 @@ class ApiService {
     }
   }
 
-  Future<Response> register(String name, String email, String password) async {
+  Future<Map<String, dynamic>> register(String name, String email, String password) async {
     try {
+      print('=== Registration Attempt ===');
+      print('Email: $email');
+      
       final response = await _dio.post(
         '/register',
         data: {
@@ -238,22 +241,81 @@ class ApiService {
         },
         options: Options(
           contentType: Headers.jsonContentType,
-          validateStatus: (status) => status! < 500,
+          validateStatus: (status) => true, // Accept any status code for better error handling
+          headers: {
+            'Accept': 'application/json',
+          },
         ),
       );
 
-      if (response.statusCode == 200 && response.data['token'] != null) {
-        final token = response.data['token'];
-        print('Registration successful, storing token: $token');
-        await _storage.write(key: 'auth_token', value: token);
+      print('=== Registration Response ===');
+      print('Status Code: ${response.statusCode}');
+      print('Response Data: ${response.data}');
+      
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        // Check for Laravel Sanctum token (either token or access_token)
+        String? token = response.data['token'];
+        
+        // If token is null, check for access_token (Laravel 8+ format)
+        if (token == null && response.data['access_token'] != null) {
+          token = response.data['access_token'];
+        }
+        
+        if (token != null) {
+          print('Registration successful, storing token: ${token.substring(0, 10)}...');
+          await _storage.write(key: 'auth_token', value: token);
+          
+          return {
+            'success': true,
+            'message': 'Registration successful',
+            'user': response.data['user'],
+            'token': token
+          };
+        } else {
+          print('Registration response missing token: ${response.data}');
+          return {
+            'success': false,
+            'message': 'Registration successful but no token received',
+            'error': 'No token'
+          };
+        }
+      } else if (response.statusCode == 422) {
+        // Validation errors
+        print('Validation errors: ${response.data}');
+        
+        String errorMessage = 'Validation error';
+        if (response.data['errors'] != null) {
+          if (response.data['errors']['email'] != null) {
+            errorMessage = response.data['errors']['email'][0];
+          } else if (response.data['errors']['password'] != null) {
+            errorMessage = response.data['errors']['password'][0];
+          } else if (response.data['errors']['name'] != null) {
+            errorMessage = response.data['errors']['name'][0];
+          }
+        } else if (response.data['message'] != null) {
+          errorMessage = response.data['message'];
+        }
+        
+        return {
+          'success': false,
+          'message': errorMessage,
+          'error': 'Validation error'
+        };
       } else {
-        print('Registration response missing token: ${response.data}');
+        print('Unexpected status code: ${response.statusCode}');
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Registration failed. Please try again.',
+          'error': 'Server error'
+        };
       }
-
-      return response;
     } catch (e) {
       print('Registration error: $e');
-      rethrow;
+      return {
+        'success': false,
+        'message': 'An error occurred during registration. Please try again.',
+        'error': e.toString()
+      };
     }
   }
 
